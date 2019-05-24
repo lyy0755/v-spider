@@ -39,81 +39,64 @@ def email(msg,title):
         msg["To"] = ';'.join(receiver)
         smtp.sendmail(sender_qq_mail, receiver, msg.as_string())
         smtp.quit()
-        print ("邮件发送成功")
+        print (title + " - " + url + " - 邮件发送成功")
     except Exception:
-        print ("Error: 无法发送邮件")
-def hkinfo():
+        print (title + " - " + url + " - Error: 无法发送邮件")
+def hkinfo(url):
     descriptionlist=[]
     impactlist=[]
     solutionslist=[]
     affectedlist=[]
     videntifierlist=[]
     rlinkslist=[]
-    url="https://www.hkcert.org/my_url/en/alert/19051505"
+    # url="https://www.hkcert.org/my_url/en/alert/19051505"
     hkinfo_info = requests.get(url)
     hkinfo_response = hkinfo_info.text
     hkinfo_soup = BeautifulSoup(hkinfo_response, 'lxml')
     # 标题
     titles = str(hkinfo_soup.find_all('h1')[0].string)
     # 描述
-    description = hkinfo_soup.find_all('div',id="content2")[0].find_all('p')
-    if "<table" in str(hkinfo_soup.find_all('div',id="content2")[0]):
-        table = str(hkinfo_soup.find_all('div',id="content2")[0].find_all('table')[0])
-    else:
-        table = ""
-
-    for h in description:
-        if h.string != "\xa0" and h.string != None:
-            descriptionlist.append(h.string)
-    description_info="<strong>Description</strong><br>"+"<br>".join(descriptionlist)+"<br>"+table+"<br><br>"
+    description = hkinfo_soup.find_all('div',id="content2")
+    for d in description:
+        descriptionlist.append(str(d).replace('display: none;', ''))
+    description_info="<strong>Description</strong><br>"+"<br>".join(descriptionlist)+"<br><br>"
     # print(description_info)
 
     # 风险影响   
-    impact = hkinfo_soup.find_all('div',id="content3")[0].find_all('li')
+    impact = hkinfo_soup.find_all('div',id="content3")
     for i in impact:
-        if i.string != "\xa0" and i.string != None:
-            impactlist.append(i.string)
+        impactlist.append(str(i).replace('display: none;', ''))
     impact_info="<strong>impact</strong><br>"+"<br>".join(impactlist)+"<br><br>"
     # print(impact_info)
 
     # 影响版本
-    affected = hkinfo_soup.find_all('div',id="content4")[0].find_all('li')
-    for j in affected:
-        if j.string != "\xa0" and j.string != None:
-            affectedlist.append(j.string)
+    affected = hkinfo_soup.find_all('div',id="content4")
+    for a in affected:
+        affectedlist.append(str(a).replace('display: none;', ''))
     affected_info="<strong>System / Technologies Affected</strong><br>"+"<br>".join(affectedlist)+"<br><br>"
     # print(affected_info)
 
     #解决办法
-    solutions = hkinfo_soup.find_all('div',id="content5")[0]
-    #解决办法-标题
-    solutions_t = solutions.p.strong.text
-    #解决办法-详情
-    solutions_d = solutions.find_all('li')
-    for n in solutions_d:
-        if n.string != "\xa0" and n.string != None:
-            solutionslist.append(n.string)
-    solutions_info = "<strong>Solutions</strong><br>"+solutions_t+"<br>"+"<br>".join(solutionslist)+"<br><br>"
-
+    solutions = hkinfo_soup.find_all('div',id="content5")
+    for s in solutions:
+        solutionslist.append(str(s).replace('display: none;', ''))
+    solutions_info = "<strong>Solutions</strong><br>"+"<br>".join(solutionslist)+"<br><br>"
+    # print(solutions_info)
     # 漏洞编号
-    videntifier= hkinfo_soup.find_all('div',id="content6")[0].find_all('a')
-    for k in videntifier:
-        astring = html.fromstring(str(k))
-        if astring.xpath('//a/text()')[0]!=None:
-            videntifierlist.append(astring.xpath('//a/text()')[0])
+    videntifier= hkinfo_soup.find_all('div',id="content6")
+    for v in videntifier:
+        videntifierlist.append(str(v).replace('display: none;', ''))
     videntifier_info="<strong>Vulnerability Identifier</strong><br>"+"<br>".join(videntifierlist)+"<br><br>"
     # print(videntifier_info)
 
     # 相关链接
-    rlinks= hkinfo_soup.find_all('div',id="content8")[0].find_all('a')
-    for l in rlinks:
-            lstring = html.fromstring(str(l))
-            if lstring.xpath('//a/text()')[0].strip() != None:
-                rlinkslist.append(lstring.xpath('//a/text()')[0].strip())
+    rlinks= hkinfo_soup.find_all('div',id="content8")
+    for r in rlinks:
+        rlinkslist.append(str(r).replace('display: none;', ''))
     rlinks_info = "<strong>Related Links</strong><br>"+"<br>".join(rlinkslist)+"<br><br>"
     # print(rlinks_info)
     msg = description_info + impact_info + affected_info + solutions_info + videntifier_info + rlinks_info
-    email(msg,titles)
+    email(msg,titles,url)
 
 def hkcert():
     url="https://www.hkcert.org/"
@@ -141,11 +124,44 @@ def hkcert():
 
             # 找当天的漏洞发送邮件
             if time == day:
-                hkinfo(detailsurl)
-                print(title +" - (" + time + ") 邮件发送中！")
+                createfile(detailsurl,title,time)
             else:
-                print("旧漏洞: " + title +" - (" + time + ")")
+                print("旧漏洞: " + title +" - (" + time + ")" + " - " + detailsurl +' - 无需操作。' )
+
+def createfile(detailsurl,title,time):
+    # 获取日期，将日期做MD5作为文件名
+    day = datetime.date.today().strftime('%Y / %m / %d')
+    md5 = hashlib.md5()   
+    md5.update(day.encode('utf-8'))
+    filemd5 = md5.hexdigest()
+
+    # 获取当前文件路径
+    # detailsurl = 'https://www.hkcert.org/my_url/en/alert/19051505'
+    dirpath = os.path.abspath(__file__)[:-12]
+
+    filename = filemd5+".txt"
+    file_path = dirpath + filename
+
+    # 判断文件是否存在
+    if os.path.isfile(filename):
+        fr = open(file_path,"r")
+        # 判断文件内容是否重复，重复不写入
+        for i in fr.readlines():
+            if detailsurl in i:
+                print(detailsurl + ' - 已经发送过邮件。')
+            else:
+                fw = open(file_path,"a+")
+                fw.writelines(str(detailsurl) + '\n')
+                hkinfo(detailsurl)
+        fr.closed
+    else:
+        print("file_path： "+ file_path)
+        fw = open(file_path,"a+")
+        fw.writelines(str(detailsurl) + '\n')
+        hkinfo(detailsurl)
+        fw.closed
 
 if __name__ == "__main__":
-    # hkcert()
-    hkinfo()
+    hkcert()
+    # hkinfo()
+
